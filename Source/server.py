@@ -3,6 +3,10 @@ import paramiko
 import os
 
 
+config_dir = '/tmp/sysinfo_conf'
+client_conf = os.path.join(config_dir, 'conf.xml')
+
+
 def upload_file():
     t = paramiko.Transport(('localhost', 22))
     t.connect(username='maxinmin', password='maxinmin')
