@@ -6,8 +6,10 @@ import json
 import os
 import platform
 
-from config import CRYPTO_KEY
 from cryptography.fernet import Fernet
+
+
+CRYPTO_KEY = b'mWK49Y-bLpaycw7xXaTO_IoFs_8vBeQtSepE0qbIva8='
 
 
 def get_secure_log_platform():
@@ -38,6 +40,7 @@ def collect_metrix():
     }
     return json.dumps(result)
 
+
 def crypto_string(key, content):
     cipher_suite = Fernet(key)
     cipher_text = cipher_suite.encrypt(content.encode('utf-8'))
@@ -47,4 +50,5 @@ def crypto_string(key, content):
 if __name__ == '__main__':
     content = collect_metrix()
     cipher_text = crypto_string(CRYPTO_KEY, content)
+    print(cipher_text.decode())
     # plain_text = Fernet(CRYPTO_KEY).decrypt(cipher_text)
