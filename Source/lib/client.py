@@ -28,7 +28,7 @@ def get_secure_log_platform():
 def collect_metrix():
     cpu_percent = psutil.cpu_percent(interval=1)
     mem = psutil.virtual_memory()
-    mem_percent = mem.available / mem.total
+    mem_percent = (mem.available / mem.total) * 100
     uptime = int(time.time()) - psutil.boot_time()
     log_content = get_secure_log_platform()
 
@@ -51,4 +51,3 @@ if __name__ == '__main__':
     content = collect_metrix()
     cipher_text = crypto_string(CRYPTO_KEY, content)
     print(cipher_text.decode())
-    # plain_text = Fernet(CRYPTO_KEY).decrypt(cipher_text)
