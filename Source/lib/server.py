@@ -2,31 +2,11 @@
 import paramiko
 import os
 import json
+import sys
+import xml.etree.ElementTree as ET
 from cryptography.fernet import Fernet
 from Source.lib.send_email import send_mail
-
-config_dir = '/tmp/sysinfo_conf'
-client_conf = os.path.join(config_dir, 'conf.xml')
-
-
-def upload_file():
-    t = paramiko.Transport(('localhost', 22))
-    t.connect(username='maxinmin', password='maxinmin')
-    sftp = paramiko.SFTPClient.from_transport(t)
-
-    client_script = os.path.join(os.path.dirname(__file__), 'client.py')
-    remote_path = '/tmp/client.py'
-
-    sftp.put(client_script, remote_path)
-
-def mkdir_remote():
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect("localhost", 22, "maxinmin", "maxinmin")
-    stdin, stdout, stderr = ssh.exec_command("mkdir /tmp/fuck")
-    print
-    stdout.readlines()
-    ssh.close()
+from Source.lib import config as cf
 
 
 class SSHConnection:
@@ -59,45 +39,77 @@ class SSHConnection:
         self.sftp.close()
 
 
-import xml.etree.ElementTree as ET
 class XMLConfig:
     def __init__(self, xml_path):
         self.path = xml_path
 
+    def _check_xml_attrs(self, d):
+        userinfo = d['info']
+        args_required = ['ip', 'username', 'password', 'mail']
+        for arg in args_required:
+            if not arg in userinfo:
+                raise ValueError("%s must be one of client attributes")
+
     def parse2obj(self):
-        tree = ET.parse(self.path)
+        try:
+            tree = ET.parse(self.path)
+        except:
+            raise TypeError('Xml file is illegal: %s' % self.path)
         root = tree.getroot()
         alerts = [child.attrib for child in root]
         result = {'info': root.attrib, 'alerts': alerts}
+        self._check_xml_attrs(result)
         return result
+
 
 def parse2text(d):
     s = []
-    s.append("<p>Memory Percent: %.2f%%</p>" % (d.get('mem_percent') * 100))
+    s.append("<p>Memory Percent: %.2f%%</p>" % d.get('mem_percent'))
     s.append("<p>CPU Percent: %.2f%%</p>" % d.get('cpu_percent'))
     s.append("<p>Uptime: %ds</p>" % int(d.get('uptime')))
     return '\n'.join(s)
 
+
 CRYPTO_KEY = b'mWK49Y-bLpaycw7xXaTO_IoFs_8vBeQtSepE0qbIva8='
 
-def main():
-    config = XMLConfig('/tmp/sysinfo_conf/conf.xml')
+
+def run(xml_path):
+    config = XMLConfig(xml_path)
     config_obj = config.parse2obj()
-    # print(config_obj)
+    email_to_list = [config_obj['info']['mail'], ]
     conn = SSHConnection(config_obj['info'])
-    # conn.exec_command('ls -alh ~')
-    source_path = os.path.join(os.path.dirname(__file__), 'client.py')
-    client_path = b'/tmp/sysinfo_conf/client.py'
+    tmp_dirname = b'/tmp/sysinfo'
+    conn.exec_command(b'mkdir ' + tmp_dirname)
+    source_path = 'client.py'
+    client_path = tmp_dirname + b'/client.py'
     conn.upload_file(source_path, client_path)
-    cmd = [b'/usr/local/bin/python3', client_path]
+    cmd = [cf.CLIENT_PYTHON_PATH, client_path]
     stdoutdata, stderrdata = conn.exec_command(b' '.join(cmd))
+    if stderrdata:
+        raise Exception("Error occure when get infomation in client : %s. Error info: %s" % \
+                        (config_obj['info']['ip'], stderrdata))
     plain_text = Fernet(CRYPTO_KEY).decrypt(stdoutdata)
     sysinfo = json.loads(plain_text.decode())
     print(sysinfo)
     email_content = parse2text(sysinfo)
     print(email_content)
-    send_mail(email_content, 'System Info', ['firstbestma@126.com'])
+    # send_mail(email_content, 'System Info', email_to_list)
     conn.close()
 
+
+def main(conf_dir):
+    import threading
+    import glob
+    conf_pattern = conf_dir + '/*.xml'
+    xml_files = glob.glob(conf_pattern)
+    for f in xml_files:
+        t = threading.Thread(target=run, args=(f, ))
+        t.start()
+
+
 if __name__ == '__main__':
-    main()
+    # run('../example/data/conf1.xml')
+    if len(sys.argv) != 2:
+        print('Usage: PYTHONPATH=../../ python3 server.py ../data')
+        exit(1)
+    main(sys.argv[1])
