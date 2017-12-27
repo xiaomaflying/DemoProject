@@ -1,0 +1,4 @@
+<client ip="127.0.0.1" port="22" username="maxinmin" password="maxinmin" mail="firstbestma@126.com">
+    <alert type="memory" limit="50%" />
+    <alert type="cpu" limit="20%" />
+</client>
