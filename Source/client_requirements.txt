@@ -1,0 +1,4 @@
+PyPiWin32
+paramiko
+pycrypto
+psutil

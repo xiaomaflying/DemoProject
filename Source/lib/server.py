@@ -67,6 +67,7 @@ def parse2text(d):
     s.append("<p>Memory Percent: %.2f%%</p>" % d.get('mem_percent'))
     s.append("<p>CPU Percent: %.2f%%</p>" % d.get('cpu_percent'))
     s.append("<p>Uptime: %ds</p>" % int(d.get('uptime')))
+    s.append("<div>%s</div>" % d.get('log_content'))
     return '\n'.join(s)
 
 
@@ -78,22 +79,26 @@ def run(xml_path):
     config_obj = config.parse2obj()
     email_to_list = [config_obj['info']['mail'], ]
     conn = SSHConnection(config_obj['info'])
-    tmp_dirname = b'/tmp/sysinfo'
+    tmp_dirname = b'SysInfo'
     conn.exec_command(b'mkdir ' + tmp_dirname)
-    source_path = 'client.py'
-    client_path = tmp_dirname + b'/client.py'
-    conn.upload_file(source_path, client_path)
-    cmd = [cf.CLIENT_PYTHON_PATH, client_path]
-    stdoutdata, stderrdata = conn.exec_command(b' '.join(cmd))
+    scripts = [b'get_windows_events.py', b'client.py', ]
+    for script in scripts:
+        client_path = b'%s/%s' % (tmp_dirname, script)
+        conn.upload_file(script, client_path)
+
+        cmd = [b'python', client_path]
+        stdoutdata, stderrdata = conn.exec_command(b' '.join(cmd))
+        # print(stdoutdata, stderrdata)
+
     if stderrdata:
         raise Exception("Error occure when get infomation in client : %s. Error info: %s" % \
                         (config_obj['info']['ip'], stderrdata))
     plain_text = Fernet(CRYPTO_KEY).decrypt(stdoutdata)
     sysinfo = json.loads(plain_text.decode())
-    print(sysinfo)
+    # print(sysinfo)
     email_content = parse2text(sysinfo)
-    print(email_content)
-    # send_mail(email_content, 'System Info', email_to_list)
+    # print(email_content)
+    send_mail(email_content, 'System Info', email_to_list)
     conn.close()
 
 
@@ -108,8 +113,8 @@ def main(conf_dir):
 
 
 if __name__ == '__main__':
-    # run('../example/data/conf1.xml')
-    if len(sys.argv) != 2:
-        print('Usage: PYTHONPATH=../../ python3 server.py ../data')
-        exit(1)
-    main(sys.argv[1])
+    run('../data/conf1.xml')
+    # if len(sys.argv) != 2:
+    #     print('Usage: PYTHONPATH=../../ python3 server.py ../data')
+    #     exit(1)
+    # main(sys.argv[1])
