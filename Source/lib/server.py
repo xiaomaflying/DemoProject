@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from cryptography.fernet import Fernet
 from Source.lib.send_email import send_mail
 from Source.lib import config as cf
+from Source.lib.db import DBConnector
 
 
 class SSHConnection:
@@ -61,7 +62,6 @@ class XMLConfig:
         self._check_xml_attrs(result)
         return result
 
-
 def parse2text(d):
     s = []
     s.append("<p>Memory Percent: %.2f%%</p>" % d.get('mem_percent'))
@@ -98,6 +98,13 @@ def run(xml_path):
     # print(sysinfo)
     email_content = parse2text(sysinfo)
     # print(email_content)
+
+    # insert into database
+    connector = DBConnector(cf.DB_CONFIG)
+    info = config_obj['info']
+    connector.execute_insert_sql(info['ip'], info['username'], info['email'], sysinfo)
+    connector.close()
+
     send_mail(email_content, 'System Info', email_to_list)
     conn.close()
 
